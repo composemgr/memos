@@ -1,5 +1,6 @@
 # nginx proxy address - http://172.17.0.1:5230
 
+name: memos
 x-logging: &default-logging
   driver: json-file
   options:
@@ -7,28 +8,30 @@ x-logging: &default-logging
     max-file: "1"
 
 services:
-  memos:
-    image: memos/memos:latest
+  app:
+    image: neosmemo/memos:latest
+    pull_policy: always
     container_name: memos-app
-    restart: unless-stopped
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
     logging: *default-logging
     networks:
       - memos
     ports:
-      - "5230:5230"
+      - "172.17.0.1:5230:5230"
     environment:
       TZ: ${TZ:-America/New_York}
-      PUID: ${SERVICE_USER:-1000}
-      PGID: ${SERVICE_GROUP:-1000}
+      MEMOS_MODE: prod
+      MEMOS_PORT: 5230
     volumes:
-      - ./volumes/config/memos:/config
-      - ./volumes/data/memos:/data
+      - ./volumes/data/memos:/var/opt/memos
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5230"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:5230/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
 
 networks:
   memos:
+    name: memos
     external: false
