@@ -17,10 +17,14 @@ services:
     logging: *default-logging
     networks:
       - memos
+      - proxy
+      - cloudflare
     ports:
       - "172.17.0.1:5230:5230"
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: memos-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
       MEMOS_MODE: prod
       MEMOS_PORT: 5230
     volumes:
@@ -30,8 +34,28 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://memos-app:5230'
+      - 'cloudflare.hostname=memos.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.memos-app.entrypoints=http'
+      - 'traefik.http.routers.memos-app-secure.tls=true'
+      - 'traefik.http.routers.memos-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.memos-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.memos-app.middlewares=memos-app-https-redirect'
+      - 'traefik.http.routers.memos-app-secure.entrypoints=https'
+      - 'traefik.http.routers.memos-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.memos-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.memos-app-secure.service=memos-app'
+      - 'traefik.http.services.memos-app.loadbalancer.server.port=5230'
 
 networks:
   memos:
     name: memos
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
